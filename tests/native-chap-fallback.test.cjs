@@ -43,6 +43,8 @@ test('native MikroTik fallback is a real CHAP form, not plaintext downgrade',()=
   assert.match(core,/storageSet\(safeSession\(\), 'najm_native_login_v1'/);
   assert.match(core,/never send plaintext|Never send plaintext/);
   const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  assert.match(html,/js\/chap\.md5\.js\?v=chap-native-20261121-1/);
+  assert.match(html,/js\/portal\.core\.js\?v=chap-native-20261121-1/);
   for(const [key,port] of Object.entries({'najm-speed-2m':62021,'najm-speed-4m':62022,'najm-speed-10m':62023,'najm-speed-open':62024})){
     assert.ok(html.includes(`'${key}':${port}`));
   }

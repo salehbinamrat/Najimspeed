@@ -40,7 +40,7 @@ test('malformed and overlong CHAP data are rejected before POST', () => {
 });
 test('modified page cache bust and camera untouched', () => {
   const index = fs.readFileSync(path.join(root,'index.html'),'utf8');
-  assert.match(index,/js\/chap\.md5\.js\?v=chap-20261121-octalfix1/);
+  assert.match(index,/js\/chap\.md5\.js\?v=chap-native-20261121-1/);
   assert.ok(index.includes("'najm-speed-2m':62021"));
   assert.ok(index.includes("'najm-speed-4m':62022"));
   assert.ok(index.includes("'najm-speed-10m':62023"));
