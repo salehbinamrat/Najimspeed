@@ -3,21 +3,33 @@
 (function (w) {
 'use strict';
 function bytesFromRouterEscaped(source) {
-  if (typeof source !== 'string' || !source || source.length > 512) return null;
-  var out = [], i = 0, ch, value, oct;
+  /* RouterOS publishes CHAP bytes as octal strings (\\371, etc).
+     $(chap-id-esc) URL-escapes the backslash: %5C371, not %F9.
+     Decode URL escapes first and then RouterOS octal. Both forms are valid. */
+  if (typeof source !== 'string' || !source || source.length > 1024) return null;
+  var encoded = [], out = [], i = 0, ch, byte, oct;
   while (i < source.length) {
     ch = source.charAt(i);
-    if (ch === '%' && /^[0-9a-fA-F]{2}$/.test(source.substr(i + 1, 2))) {
-      value = parseInt(source.substr(i + 1, 2), 16); i += 3;
-    } else if (ch === '\\' && /^[0-7]{3}$/.test(source.substr(i + 1, 3))) {
-      value = parseInt(source.substr(i + 1, 3), 8); i += 4;
-    } else if (ch === '+') {
-      value = 32; i++;
+    if (ch === '%') {
+      if (!/^[0-9a-fA-F]{2}$/.test(source.substr(i + 1, 2))) return null;
+      byte = parseInt(source.substr(i + 1, 2), 16); i += 3;
+    } else if (ch === '+') { byte = 32; i++;
     } else {
-      value = source.charCodeAt(i++);
-      if (value > 127 || value < 32 || ch === '%' || ch === '\\') return null;
+      byte = source.charCodeAt(i++);
+      if (byte < 32 || byte > 126) return null;
     }
-    out.push(value);
+    encoded.push(byte);
+  }
+  for (i = 0; i < encoded.length;) {
+    if (encoded[i] === 92) {
+      if (i + 3 >= encoded.length ||
+          encoded[i+1] < 48 || encoded[i+1] > 55 ||
+          encoded[i+2] < 48 || encoded[i+2] > 55 ||
+          encoded[i+3] < 48 || encoded[i+3] > 55) return null;
+      oct = (encoded[i+1]-48)*64 + (encoded[i+2]-48)*8 + encoded[i+3]-48;
+      if (oct > 255) return null;
+      out.push(oct); i += 4;
+    } else { out.push(encoded[i]); i++; }
   }
   return out;
 }
