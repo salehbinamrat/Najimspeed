@@ -3,7 +3,7 @@
 var cfg = w.PORTAL_CONFIG || {};
 var $login, $status, $form, $submit, $logout, $error;
 var signedIn = false, loginPending = false, logoutPending = false;
-var attemptUser = '', attemptPass = '';
+var attemptUser = '', attemptPass = '', attemptSpeed = 'hotspot';
 var statusTimer = 0, errorTimer = 0, welcomeTimer = 0, blockTimer = 0;
 var statusRequest = null, statusFailures = 0, epoch = 0, activeLoginSerial = 0;
 var loginTimestamp = 0, earlyNegativeCount = 0;
@@ -70,7 +70,7 @@ code = 'TIME_LIMIT'; message = 'انتهى وقت الكرت';
 } else if (/\b(?:account expired|user expired|expired account|profile expired|validity expired|user validity expired|validity period expired|card expired|account has expired)\b|(?:انتهت|انتهاء) صلاحية (?:الكرت|الحساب|الباقة)|(?:كرت|حساب|بطاقة) منته(?:ية|ي) الصلاحية/.test(t)) {
 code = 'EXPIRED'; message = 'انتهت صلاحية الكرت';
 } else if (/\b(?:no more sessions|no more sessions are allowed|simultaneous session(?:s)?|session limit (?:reached|exceeded)|too many (?:active |concurrent )?sessions|maximum (?:active )?sessions|already logged in|already active|user already logged|user is online|already in use|only one login per user)\b|(?:مستخدم|يستخدم) (?:على|من) جهاز آخر|(?:الكرت|الحساب) قيد الاستخدام|(?:عدد|حد) الجلسات/.test(t)) {
-code = 'SESSION_LIMIT'; message = 'الكرت مستخدم على جهاز آخر';
+code = 'SESSION_LIMIT'; message = 'الكرت قيد الاستخدام في جلسة أخرى';
 } else if (/\b(?:invalid calling.station.id|not allowed to log in from this mac|mac address (?:not allowed|mismatch)|mac mismatch|device binding|mac binding|not allowed from this mac|not allowed from this device)\b|(?:الجهاز غير مسموح|عنوان الجهاز غير مسموح|هذا الجهاز غير مصرح)/.test(t)) {
 code = 'DEVICE_RESTRICTION'; message = 'هذا الكرت غير مسموح على هذا الجهاز';
 } else if (/\b(?:account disabled|user disabled|user is disabled|disabled user|account inactive|user is inactive)\b|(?:الحساب|المستخدم) معطل/.test(t)) {
@@ -80,7 +80,7 @@ code = 'AUTH_SERVER_UNAVAILABLE'; message = 'خادم الشبكة لا يستج
 } else if (/\b(?:already authorizing|authorization in progress|authentication in progress)\b/.test(t)) {
 code = 'AUTH_IN_PROGRESS'; message = 'جاري التحقق من الكرت، حاول مجددا';
 } else if (/\b(?:web browser did not send|chap challenge|invalid chap|challenge response)\b/.test(t)) {
-code = 'AUTH_METHOD'; message = 'خطأ في نظام الدخول، تواصل مع الدعم';
+code = 'AUTH_METHOD'; message = 'تعذر إتمام المصادقة؛ أعد المحاولة أو تواصل مع الدعم';
 } else if (/\b(?:no more ip addresses|ip pool is empty|no available ip|ip address unavailable|cannot assign ip address)\b/.test(t)) {
 code = 'IP_UNAVAILABLE'; message = 'تعذر تخصيص عنوان للجهاز';
 } else if (/\b(?:too many attempts|temporarily locked|too many login attempts)\b/.test(t)) {
@@ -92,15 +92,15 @@ code = 'UNSPECIFIED_LIMIT'; message = 'بلغ الكرت حد الاستخدام
    has no usable plan. Follow the requested generic bad-card UX here. */
 code = 'NO_VALID_PROFILE'; message = 'لا توجد باقة صالحة لهذا الكرت؛ تواصل مع الدعم';
 } else if (/\b(?:user(?:name)?\s+(?:does not exist|not found|unknown)|unknown user(?:name)?|no such user|user not found|account not found|no such account)\b|(?:رقم الكرت|اسم المستخدم|الحساب) غير موجود|لا يوجد (?:حساب|مستخدم) بهذا/.test(t)) {
-code = 'USER_NOT_FOUND'; message = BAD_CARD_MESSAGE;
+code = 'USER_NOT_FOUND'; message = 'رقم الكرت غير موجود';
 } else if (/\b(?:invalid username|invalid user name|invalid user)(?!\s+(?:or|and|&)\s+password)\b/.test(t)) {
 code = 'INVALID_USERNAME'; message = BAD_CARD_MESSAGE;
 } else if (/\b(?:invalid (?:username|user name|user) (?:or|and|&) password|wrong (?:username|user name) or password|invalid credentials|incorrect (?:username|user name) or password|bad credentials)\b|(?:بيانات الدخول|بيانات الحساب) غير صحيحة/.test(t)) {
-code = 'INVALID_CREDENTIALS'; message = hasPassword ? 'اسم المستخدم أو كلمة المرور خطأ' : BAD_CARD_MESSAGE;
+code = 'INVALID_CREDENTIALS'; message = hasPassword ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'بيانات الكرت غير صحيحة؛ تحقق من الرقم';
 } else if (/\b(?:authentication failed|access.reject|radius reject)\b/.test(t)) {
 code = 'AUTH_REJECTED'; message = 'رفض خادم المصادقة تسجيل الدخول؛ تحقق من صلاحية الكرت أو تواصل مع الدعم';
 } else if (/\b(?:invalid password|wrong password|bad password|incorrect password)\b|كلمة المرور غير صحيحة/.test(t)) {
-code = 'INVALID_PASSWORD'; message = hasPassword ? 'كلمة المرور خطأ' : BAD_CARD_MESSAGE;
+code = 'INVALID_PASSWORD'; message = hasPassword ? 'كلمة المرور خطأ' : 'تعذر التحقق من كلمة مرور الكرت؛ تواصل مع الدعم';
 } else if (/\b(?:login denied|access denied|authorization denied|login not allowed|login rejected|not allowed to login)\b|تم رفض تسجيل الدخول/.test(t)) {
 code = 'REJECTED'; message = 'رفض الراوتر تسجيل الدخول؛ تحقق من الكرت أو تواصل مع الدعم';
 } else if (/[\u0600-\u06FF]/.test(text) && !/[A-Za-z]/.test(text)) {
@@ -404,6 +404,11 @@ statusReply(response);
 if (kind === 'boot' && signedIn && !logoutPending) scheduleStatus();
 return true;
 }
+if (kind === 'challenge') {
+if (response.action !== 'onChapChallenge' || typeof response.enabled !== 'boolean') return false;
+challengeReply(response);
+return true;
+}
 if (kind === 'login') {
 if (response.action === 'onLoggedIn') loggedInReply(response);
 else if (response.action === 'onLoginError') loginErrorReply(response);
@@ -423,7 +428,7 @@ completed = true; clearTimeout(watchdog);
 try { xhr.onreadystatechange = null; xhr.onerror = null; } catch (ignore) {}
 if (requestEpoch !== epoch) return;
 if (problem) {
-if (options.kind === 'login') {
+if (options.kind === 'login' || options.kind === 'challenge') {
 finishLogin(); attemptUser = ''; attemptPass = '';
 showError(problem === 'TIMEOUT' ? 'تأخر رد الراوتر، حاول مجددا' :
 problem === 'NETWORK' ? 'انقطع الاتصال بالراوتر، حاول مجددا' :
@@ -468,17 +473,39 @@ return false;
 }
 attemptUser = user; attemptPass = pass; loginPending = true;
 epoch++; activeLoginSerial++;
-var serial = activeLoginSerial, choice = selectedSpeed();
+var serial = activeLoginSerial, choice = selectedSpeed(); attemptSpeed = choice;
 if ($submit) { $submit.disabled = true; addClass($submit, 'processing'); }
 clearError(); saveSpeed(choice); speedConfirm();
 signalSpeed(choice, serial, function () {
 if (!loginPending || serial !== activeLoginSerial) return;
-var body = 'username=' + encodeURIComponent(user);
-if (cfg.passwordRequired) body += '&password=' + encodeURIComponent(pass);
-if (choice !== 'hotspot') body += '&domain=' + encodeURIComponent(choice);
-request('/login?var=callBack', {kind:'login',method:'POST',body:body});
+/* Request the challenge from /login. RouterOS exposes chap-id only there. */
+request('/login?var=najmChap&t=' + now(), {kind:'challenge'});
 });
 return false;
+}
+/* Reject malformed CHAP rather than falling back to plaintext credentials. */
+function challengeReply(response) {
+if (!loginPending) return;
+var body = 'username=' + encodeURIComponent(attemptUser), cardPassword;
+var choice = attemptSpeed;
+if (response.enabled) {
+  cardPassword = cfg.passwordRequired ? attemptPass :
+    (cfg.cardPasswordMode === 'username' ? attemptUser : '');
+  if (!w.NajmChap || typeof w.NajmChap.response !== 'function') {
+    finishLogin(); showError('ملف المصادقة غير متاح؛ أعد تحميل الصفحة'); return;
+  }
+  var hashed = w.NajmChap.response(response.id, response.challenge, cardPassword);
+  if (!hashed) {
+    finishLogin(); showError('تعذر قراءة تحدي المصادقة من الراوتر؛ أعد المحاولة'); return;
+  }
+  body += '&password=' + encodeURIComponent(hashed);
+} else {
+  /* PAP/HTTPS: preserve username-only login with an optional configured mode. */
+  if (cfg.passwordRequired) body += '&password=' + encodeURIComponent(attemptPass);
+  else if (cfg.cardPasswordMode === 'username') body += '&password=' + encodeURIComponent(attemptUser);
+}
+if (choice !== 'hotspot') body += '&domain=' + encodeURIComponent(choice);
+request('/login?var=callBack', {kind:'login',method:'POST',body:body});
 }
 function logout() {
 if (!signedIn || logoutPending) return;

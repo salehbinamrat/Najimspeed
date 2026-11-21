@@ -16,6 +16,7 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check js/portal.core.js
+          node --check js/chap.md5.js
           node --check js/cam.najm.js
       - name: Run regressions
-        run: node --test tests/portal.test.cjs
+        run: node --test tests/*.test.cjs
