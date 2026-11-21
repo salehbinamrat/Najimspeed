@@ -7,6 +7,9 @@ var status = document.getElementById("scanStatus");
 var input = document.querySelector('input[name="username"]');
 if (!modal || !start || !close || !status || !input) return;
 var worker = null, ready = null, sequence = 0;
+function active() { return (' ' + modal.className + ' ').indexOf(' active ') >= 0; }
+function activate() { if (!active()) modal.className += ' active'; }
+function removeActive() { modal.className = modal.className.replace(/(^|\s)active(?=\s|$)/g, ' ').replace(/^\s+|\s+$/g, ''); }
 function message(text, style) {
 status.textContent = text;
 status.className = "scan-status" + (style ? " " + style : "");
@@ -64,7 +67,7 @@ bindPicture("retryFileInput");
 }
 function deactivate() {
 sequence++;
-modal.classList.remove("active");
+removeActive();
 modal.setAttribute("aria-hidden", "true");
 status.textContent = "";
 start.focus();
@@ -137,13 +140,13 @@ status.appendChild(retryButton);
 });
 }
 start.addEventListener("click", function () {
-modal.classList.add("active");
+activate();
 modal.setAttribute("aria-hidden", "false");
 cameraHome();
 close.focus();
 });
 close.addEventListener("click", deactivate);
 document.addEventListener("keydown", function (event) {
-if (event.key === "Escape" && modal.classList.contains("active")) deactivate();
+if (event.key === "Escape" && active()) deactivate();
 });
 });
