@@ -20,3 +20,22 @@ jobs:
           node --check js/cam.najm.js
       - name: Run regressions
         run: node --test tests/*.test.cjs
+      - name: Package tested MikroTik Hotspot files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/stage
+          cp index.html alogin.html error.html flogin.html flogout.html fstatus.html login.html logout.html redirect.html status.html dist/stage/
+          cp -R css font img js dist/stage/
+          (cd dist/stage && zip -q -r "../Najimspeed-Hotspot-${GITHUB_SHA:0:12}.zip" .)
+          rm -rf dist/stage
+          (cd dist && sha256sum *.zip > SHA256SUMS.txt)
+      - name: Upload validated Hotspot package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Najimspeed-Hotspot-tested
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30

@@ -7,6 +7,7 @@ var attemptUser = '', attemptPass = '', attemptSpeed = 'hotspot';
 var statusTimer = 0, errorTimer = 0, welcomeTimer = 0, blockTimer = 0;
 var statusRequest = null, statusFailures = 0, epoch = 0, activeLoginSerial = 0;
 var loginTimestamp = 0, earlyNegativeCount = 0;
+var loginVerifyAttempts = 0;
 var signalImages = [], recentCards = [];
 var STORE = cfg.storageKey || 'hotspot_saved_cards_v3';
 var SPEED_STORE = cfg.speedKey || 'hotspot_speed_choice';
@@ -388,8 +389,26 @@ attemptUser = ''; attemptPass = '';
 }
 function loginStartReply(response) {
 if (isLoggedIn(response.logged_in)) loggedInReply(response);
-else if (loginPending) { finishLogin(); showError('تعذر تأكيد الدخول، حاول مجددا'); }
+else if (loginPending) verifyLoginAfterAmbiguousReply();
 }
+/* An accepted MikroTik login can return a redirected HTML response rather
+   than callback JSON. Verify the authenticated account before reporting a
+   failure. Never repeat a POST and never trust a different logged-in user. */
+function verifyLoginAfterAmbiguousReply() {
+if (!loginPending) return;
+if (loginVerifyAttempts >= 2) {
+finishLogin(); attemptUser = ''; attemptPass = '';
+showError('تعذر تأكيد حالة الدخول من الراوتر؛ تحقق من الاتصال وحاول مجددا');
+return;
+}
+loginVerifyAttempts++;
+var serial = activeLoginSerial;
+setTimeout(function () {
+if (loginPending && serial === activeLoginSerial)
+request('/status?var=callBack&t=' + now(), {kind:'verify'});
+}, loginVerifyAttempts === 1 ? 0 : 750);
+}
+
 function loggedOutReply(response) {
 if (isLoggedIn(response.logged_in)) { finishLogout(); showError('تعذر تسجيل الخروج، حاول مجددا'); startStatus(); return; }
 signedIn = false; epoch++; stopStatus();
@@ -407,6 +426,14 @@ return true;
 if (kind === 'challenge') {
 if (response.action !== 'onChapChallenge' || typeof response.enabled !== 'boolean') return false;
 challengeReply(response);
+return true;
+}
+if (kind === 'verify') {
+if (response.action !== 'onStatusQuery') return false;
+if (isLoggedIn(response.logged_in) && typeof response.username === 'string' &&
+    normalize(safeDecode(response.username), true) === attemptUser) {
+loggedInReply({logged_in:'yes'});
+} else verifyLoginAfterAmbiguousReply();
 return true;
 }
 if (kind === 'login') {
@@ -428,7 +455,10 @@ completed = true; clearTimeout(watchdog);
 try { xhr.onreadystatechange = null; xhr.onerror = null; } catch (ignore) {}
 if (requestEpoch !== epoch) return;
 if (problem) {
-if (options.kind === 'login' || options.kind === 'challenge') {
+if (options.kind === 'login' || options.kind === 'verify') {
+/* The POST may have been accepted despite an HTML/HTTP/timeout response. */
+verifyLoginAfterAmbiguousReply();
+} else if (options.kind === 'challenge') {
 finishLogin(); attemptUser = ''; attemptPass = '';
 showError(problem === 'TIMEOUT' ? 'تأخر رد الراوتر، حاول مجددا' :
 problem === 'NETWORK' ? 'انقطع الاتصال بالراوتر، حاول مجددا' :
@@ -472,6 +502,7 @@ showError(cfg.passwordRequired ? 'أدخل اسم المستخدم وكلمة ا
 return false;
 }
 attemptUser = user; attemptPass = pass; loginPending = true;
+loginVerifyAttempts = 0;
 epoch++; activeLoginSerial++;
 var serial = activeLoginSerial, choice = selectedSpeed(); attemptSpeed = choice;
 if ($submit) { $submit.disabled = true; addClass($submit, 'processing'); }
