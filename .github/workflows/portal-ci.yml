@@ -1,0 +1,21 @@
+name: Najm Hotspot Static Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  portal-tests:
+    name: Validate Hotspot templates and JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check js/portal.core.js
+          node --check js/cam.najm.js
+      - name: Run regressions
+        run: node --test tests/portal.test.cjs

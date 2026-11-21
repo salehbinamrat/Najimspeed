@@ -90,23 +90,25 @@ code = 'UNSPECIFIED_LIMIT'; message = 'بلغ الكرت حد الاستخدام
 } else if (/\b(?:no valid profile(?: found)?|no profile available|no active profile)\b|لا توجد باقة صالحة/.test(t)) {
 /* No valid profile does not reveal whether the user is unknown, inactive, or
    has no usable plan. Follow the requested generic bad-card UX here. */
-code = 'NO_VALID_PROFILE'; message = BAD_CARD_MESSAGE;
+code = 'NO_VALID_PROFILE'; message = 'لا توجد باقة صالحة لهذا الكرت؛ تواصل مع الدعم';
 } else if (/\b(?:user(?:name)?\s+(?:does not exist|not found|unknown)|unknown user(?:name)?|no such user|user not found|account not found|no such account)\b|(?:رقم الكرت|اسم المستخدم|الحساب) غير موجود|لا يوجد (?:حساب|مستخدم) بهذا/.test(t)) {
 code = 'USER_NOT_FOUND'; message = BAD_CARD_MESSAGE;
 } else if (/\b(?:invalid username|invalid user name|invalid user)(?!\s+(?:or|and|&)\s+password)\b/.test(t)) {
 code = 'INVALID_USERNAME'; message = BAD_CARD_MESSAGE;
-} else if (/\b(?:invalid (?:username|user name|user) (?:or|and|&) password|wrong (?:username|user name) or password|invalid credentials|incorrect (?:username|user name) or password|authentication failed|access.reject|radius reject|bad credentials)\b|(?:بيانات الدخول|بيانات الحساب) غير صحيحة/.test(t)) {
+} else if (/\b(?:invalid (?:username|user name|user) (?:or|and|&) password|wrong (?:username|user name) or password|invalid credentials|incorrect (?:username|user name) or password|bad credentials)\b|(?:بيانات الدخول|بيانات الحساب) غير صحيحة/.test(t)) {
 code = 'INVALID_CREDENTIALS'; message = hasPassword ? 'اسم المستخدم أو كلمة المرور خطأ' : BAD_CARD_MESSAGE;
+} else if (/\b(?:authentication failed|access.reject|radius reject)\b/.test(t)) {
+code = 'AUTH_REJECTED'; message = 'رفض خادم المصادقة تسجيل الدخول؛ تحقق من صلاحية الكرت أو تواصل مع الدعم';
 } else if (/\b(?:invalid password|wrong password|bad password|incorrect password)\b|كلمة المرور غير صحيحة/.test(t)) {
 code = 'INVALID_PASSWORD'; message = hasPassword ? 'كلمة المرور خطأ' : BAD_CARD_MESSAGE;
 } else if (/\b(?:login denied|access denied|authorization denied|login not allowed|login rejected|not allowed to login)\b|تم رفض تسجيل الدخول/.test(t)) {
-code = 'REJECTED'; message = hasPassword ? 'تعذر الدخول، تحقق من بيانات الكرت' : BAD_CARD_MESSAGE;
+code = 'REJECTED'; message = 'رفض الراوتر تسجيل الدخول؛ تحقق من الكرت أو تواصل مع الدعم';
 } else if (/[\u0600-\u06FF]/.test(text) && !/[A-Za-z]/.test(text)) {
-code = 'SERVER_ARABIC'; message = 'تعذر تسجيل الدخول، تواصل مع الدعم';
+code = 'SERVER_ARABIC'; message = 'رفض الراوتر عملية الدخول؛ تواصل مع الدعم لمعرفة السبب';
 } else {
 /* A generic unknown Hotspot rejection is not proof of any specific limit.
    Do not replace known network errors with a bad-card message. */
-message = hasPassword ? 'تعذر الدخول، تحقق من بيانات الكرت' : BAD_CARD_MESSAGE;
+message = 'تعذر تحديد سبب رفض الدخول؛ تحقق من الكرت أو تواصل مع الدعم';
 }
 return { code:code, message:message,
 confirmed:code !== 'UNKNOWN' && code !== 'REJECTED' && code !== 'NO_VALID_PROFILE' && code !== 'SERVER_ARABIC',
@@ -196,32 +198,23 @@ out.push({username:user,password:cfg.passwordRequired?pass:''});
 return out;
 }
 function cookieValue(key) {
-var cookies = d.cookie ? d.cookie.split(';') : [], prefix = key + '=';
+var raw = ''; try { raw = d.cookie || ''; } catch (ignore) {}
+var cookies = raw ? raw.split(';') : [], prefix = key + '=';
 for (var i = 0; i < cookies.length; i++) {
 var c = trim(cookies[i]); if (c.indexOf(prefix) !== 0) continue;
 try { return decodeURIComponent(c.substring(prefix.length)); } catch (ignore) { return c.substring(prefix.length); }
 }
 return null;
 }
-function deleteLegacyCookie(key) { d.cookie = key + '=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; SameSite=Lax'; }
+function deleteLegacyCookie(key) { try { d.cookie = key + '=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; SameSite=Lax'; } catch (ignore) {} }
 function saveCards() {
 return storageSet(safeLocal(), STORE, JSON.stringify({savedAt:now(),cards:recentCards}));
 }
 function migrateCards() {
-var migrated = [];
-if (cfg.passwordRequired) {
-var oldStorage = storageGet(safeLocal(), 'jawhara_success_cards_v2'), old;
-try { old = oldStorage ? JSON.parse(oldStorage) : null; } catch (ignore) { old = null; }
-if (old && old.savedAt && now() >= old.savedAt && now() - old.savedAt < HISTORY_TTL)
-migrated = parseCards(JSON.stringify(old.cards || []));
-if (!migrated.length) migrated = parseCards(cookieValue('savedHotspotCards') || '[]');
-} else {
-migrated = parseCards(cookieValue('storedValues') || '[]');
+var migrated = parseCards(cookieValue('storedValues') || '[]');
 migrated.reverse(); /* Legacy Najm cookie stored oldest-first. */
-}
 if (migrated.length) { recentCards = migrated; if (saveCards()) {
-if (cfg.passwordRequired) { storageRemove(safeLocal(), 'jawhara_success_cards_v2'); deleteLegacyCookie('savedHotspotCards'); }
-else { deleteLegacyCookie('storedValues'); deleteLegacyCookie('username'); }
+deleteLegacyCookie('storedValues'); deleteLegacyCookie('username');
 }}
 }
 function loadCards() {
@@ -258,13 +251,8 @@ if (recentCards.length) removeClass(empty, 'show'); else addClass(empty, 'show')
 }}
 for (var i = 0; i < recentCards.length; i++) (function (card) {
 var button = d.createElement('button'); button.type = 'button';
-button.className = cfg.site === 'najm' ? 'previous-card-item' : 'saved-card-button';
-if (cfg.site === 'najm') setText(button, card.username);
-else {
-var icon = d.createElement('span'), label = d.createElement('strong');
-icon.className = 'icon-user'; icon.setAttribute('aria-hidden', 'true');
-setText(label, card.username); button.appendChild(icon); button.appendChild(label);
-}
+button.className = 'previous-card-item';
+setText(button, card.username);
 button.addEventListener('click', function () {
 if ($form) {
 $form.username.value = card.username;
@@ -278,8 +266,7 @@ list.appendChild(button);
 }
 function clearCards() {
 recentCards = []; storageRemove(safeLocal(), STORE);
-storageRemove(safeLocal(), 'jawhara_success_cards_v2');
-deleteLegacyCookie('storedValues'); deleteLegacyCookie('savedHotspotCards'); deleteLegacyCookie('username');
+deleteLegacyCookie('storedValues'); deleteLegacyCookie('username');
 renderCards();
 }
 function selectedSpeed() {
@@ -412,6 +399,7 @@ function dispatchByKind(kind, response) {
 if (!response || typeof response !== 'object') return false;
 if (kind === 'boot' || kind === 'status') {
 if (response.action !== 'onStatusQuery') return false;
+if (kind === 'boot' && loginPending && !isLoggedIn(response.logged_in)) return true;
 statusReply(response);
 if (kind === 'boot' && signedIn && !logoutPending) scheduleStatus();
 return true;
@@ -561,41 +549,11 @@ input.addEventListener('input', normalise, false);
 input.addEventListener('compositionend', normalise, false);
 })(fields[i], i === 0);
 }
-function initPasswordVisibility() {
-if (!cfg.passwordRequired) return;
-var toggle = el('passwordVisibilityBtn'), password = $form && $form.password;
-if (toggle && password) toggle.addEventListener('click', function () {
-password.type = password.type === 'password' ? 'text' : 'password';
-setText(toggle, password.type === 'password' ? 'إظهار' : 'إخفاء');
-}, false);
-}
-function initTheme() {
-if (cfg.site !== 'jawhara') return;
-var html = d.documentElement;
-function refresh() {
-var items = d.querySelectorAll('[data-set-mode],[data-set-theme]');
-for (var i = 0; i < items.length; i++) {
-var mode = items[i].getAttribute('data-set-mode'), theme = items[i].getAttribute('data-set-theme');
-removeClass(items[i], 'active');
-if (mode ? mode === html.getAttribute('data-mode') : theme === html.getAttribute('data-theme')) addClass(items[i], 'active');
-}
-}
-function bind(attr, target, key) {
-var items = d.querySelectorAll('[' + attr + ']');
-for (var i = 0; i < items.length; i++) items[i].addEventListener('click', function () {
-var value = this.getAttribute(attr); html.setAttribute(target, value);
-storageSet(safeLocal(), key, value); refresh();
-}, false);
-}
-bind('data-set-mode', 'data-mode', 'jawharaMode');
-bind('data-set-theme', 'data-theme', 'jawharaTheme');
-refresh();
-}
 function init() {
 $login = el('login'); $status = el('status'); $form = d.forms.login;
 $submit = d.querySelector('.login-submit'); $logout = d.querySelector('.logout-submit'); $error = el('error');
 simplifyOnOldDevices(); renderDates(); resetStatus(); speedConfirm(); showSpeed();
-setupPopups(); initInput(); initPasswordVisibility(); initTheme(); renderCards(); initWelcome();
+setupPopups(); initInput(); renderCards(); initWelcome();
 showRedirectedLoginError();
 if ($form) $form.addEventListener('submit', function (event) {
 if (event.preventDefault) event.preventDefault(); else event.returnValue = false;
