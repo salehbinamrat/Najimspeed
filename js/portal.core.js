@@ -496,7 +496,18 @@ if (response.enabled) {
   }
   var hashed = w.NajmChap.response(response.id, response.challenge, cardPassword);
   if (!hashed) {
-    finishLogin(); showError('تعذر قراءة تحدي المصادقة من الراوتر؛ أعد المحاولة'); return;
+    /* Never send plaintext when the router advertised CHAP. The native page
+       receives its own fresh RouterOS challenge and avoids escaped JSON
+       challenges that some devices/RouterOS templates cannot parse. */
+    storageSet(safeSession(), 'najm_native_login_v1', JSON.stringify({
+      username: attemptUser, speed: choice,
+      passwordMode: cfg.cardPasswordMode === 'username' ? 'username' : 'empty',
+      createdAt: now()
+    }));
+    finishLogin();
+    showError('تعذر قراءة تحدي المصادقة؛ جار فتح نموذج دخول متوافق');
+    w.location.href = '/login?var=najmNative';
+    return;
   }
   body += '&password=' + encodeURIComponent(hashed);
 } else {

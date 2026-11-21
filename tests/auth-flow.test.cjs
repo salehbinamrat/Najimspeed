@@ -66,6 +66,9 @@ for(const mode of ['pap','chap','invalid']) test('login request flow '+mode,asyn
       assert.ok(post[0].body.includes('password='+crypto.createHash('md5').update(Buffer.concat([Buffer.from([0xf9]),bytes])).digest('hex')));
     }else assert.ok(!post[0].body.includes('password='));
   }
-  if(mode==='invalid') assert.match(h.elems.error.textContent,/تحدي المصادقة/);
+  if(mode==='invalid') {
+    assert.match(h.elems.error.textContent,/تحدي المصادقة/);
+    assert.equal(h.win.location.href, '/login?var=najmNative');
+  }
   h.dispose();
 });

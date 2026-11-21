@@ -5,6 +5,46 @@ $(else)
 {"action":"onChapChallenge","enabled":false}
 $(endif)
 $(else)
+$(if var == "najmNative")
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="cache-control" content="no-store"><title>نجم نت - الدخول المتوافق</title><style>body{font-family:Arial,Tahoma,sans-serif;max-width:440px;margin:35px auto;padding:16px;text-align:center;background:#fff3f5;color:#6b092d}main{background:white;border:1px solid #d8aab9;border-radius:16px;padding:20px}input,button{display:block;box-sizing:border-box;width:100%;padding:13px;margin:14px 0;font-size:17px;border-radius:10px}input{border:1px solid #c88fa4}button{border:0;background:#9d0039;color:white}a{color:#850c38}#nativeError{color:#b00020;min-height:25px}</style></head><body><main><h2>نجم نت</h2><p>تعذر استخدام طريقة التحقق السريع. سجل الدخول من النموذج المتوافق مع الراوتر.</p><form name="nativeCardLogin" action="$(link-login-only)" method="post" onsubmit="return submitNativeCardLogin()"><input name="username" required maxlength="64" autocomplete="off" inputmode="text" placeholder="رقم الكرت"><input name="password" type="hidden" value=""><input name="domain" type="hidden" value=""><input name="dst" type="hidden" value="$(link-orig-esc)"><p id="nativeError" role="alert"></p><button type="submit">تسجيل الدخول</button></form><a href="index.html">العودة إلى الصفحة الرئيسية</a></main>
+$(if chap-id)
+<script src="js/chap.md5.js?v=chap-native-20261121"></script>
+$(endif)
+<script>
+window.NajmNativePasswordMode='empty';
+(function(){
+  try {
+    var saved=sessionStorage.getItem('najm_native_login_v1');
+    sessionStorage.removeItem('najm_native_login_v1');
+    var state=saved?JSON.parse(saved):null;
+    if(!state || !state.createdAt || Math.abs(Date.now()-state.createdAt)>120000) return;
+    var f=document.forms.nativeCardLogin;
+    if(typeof state.username==='string' && /^[^\x00-\x1f\x7f]{1,64}$/.test(state.username)) f.username.value=state.username;
+    if(state.passwordMode==='username') window.NajmNativePasswordMode='username';
+    if(/^(najm-speed-2m|najm-speed-4m|najm-speed-10m|najm-speed-open)$/.test(state.speed||'')) f.domain.value=state.speed;
+  } catch(ignore){}
+})();
+function submitNativeCardLogin(){
+  var f=document.forms.nativeCardLogin;
+  var username=f.username.value.replace(/^\s+|\s+$/g,'');
+  f.username.value=username;
+  if(!username){document.getElementById('nativeError').textContent='أدخل رقم الكرت';return false;}
+  $(if chap-id)
+  if(!window.NajmChap || typeof window.NajmChap.responseRaw!=='function'){
+    document.getElementById('nativeError').textContent='تعذر تحميل مكون المصادقة؛ حدث الصفحة';return false;
+  }
+  var pass=window.NajmNativePasswordMode==='username'?username:'';
+  var hashed=window.NajmChap.responseRaw('$(chap-id)','$(chap-challenge)',pass);
+  if(!hashed){document.getElementById('nativeError').textContent='لم يقدم الراوتر تحدي CHAP صالحا. تواصل مع مسؤول الشبكة';return false;}
+  f.password.value=hashed;
+  $(else)
+  f.password.value=window.NajmNativePasswordMode==='username'?username:'';
+  $(endif)
+  return true;
+}
+</script>
+</body></html>
+$(else)
 $(if var == "")
 <!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>نجم نت - تسجيل الدخول</title><style>body{font-family:Arial,sans-serif;max-width:450px;margin:40px auto;padding:14px;text-align:center;background:#eef2f5;color:#1b2330}form{border:1px solid #b0b8c1;border-radius:14px;background:#fff;padding:22px}input,button{font-size:17px;display:block;width:100%;box-sizing:border-box;margin:12px 0;padding:12px;border-radius:9px;border:1px solid #8895a7}button{color:#fff;background:#1262ad;border:0}p{line-height:1.8}</style></head><body><h2>نجم نت</h2><p>أدخل رقم الكرت لتسجيل الدخول.</p>$(if error)<p role="alert" style="color:#a11629">تعذر تسجيل الدخول؛ تحقق من رقم الكرت أو تواصل مع الدعم</p>$(endif)<form action="$(link-login-only)" method="post"><input name="username" maxlength="64" placeholder="رقم الكرت / اسم المستخدم" required autocomplete="off"><button type="submit">دخول</button></form><p><a href="index.html">فتح الصفحة الرئيسية</a></p><span id="hotspot-error-reasons" hidden data-original="$(error-orig-esc)" data-translated="$(error-esc)"></span><script>(function(){
 var reason = document.getElementById('hotspot-error-reasons');
@@ -24,6 +64,8 @@ $(if error == "")
 $(else)
 {"logged_in":"$(logged-in)","error_orig":"$(error-orig-esc)","error":"$(error-esc)","action":"onLoginError"}
 $(endif)
+$(endif)
+
 $(endif)
 
 $(endif)

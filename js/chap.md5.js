@@ -22,6 +22,11 @@ function bytesFromRouterEscaped(source) {
   }
   for (i = 0; i < encoded.length;) {
     if (encoded[i] === 92) {
+      /* Some intermediary encoders double-escape the RouterOS octal slash. */
+      if (encoded[i+1] === 92 && i+4 < encoded.length &&
+          encoded[i+2] >= 48 && encoded[i+2] <= 55 &&
+          encoded[i+3] >= 48 && encoded[i+3] <= 55 &&
+          encoded[i+4] >= 48 && encoded[i+4] <= 55) i++;
       if (i + 3 >= encoded.length ||
           encoded[i+1] < 48 || encoded[i+1] > 55 ||
           encoded[i+2] < 48 || encoded[i+2] > 55 ||
@@ -91,5 +96,21 @@ function challengeResponse(idEsc, challengeEsc, password) {
   if (!id || id.length !== 1 || !challenge || challenge.length !== 16 || typeof password !== 'string') return null;
   return md5(id.concat(utf8Bytes(password), challenge));
 }
-w.NajmChap = {response:challengeResponse};
+/* Canonical MikroTik HTML uses JS string literals containing RouterOS octal
+   sequences (for example '\\371'); JavaScript decodes those into Latin-1
+   characters before this function receives them. Never UTF-8 encode the nonce. */
+function challengeResponseRaw(idRaw, challengeRaw, password) {
+  if (typeof idRaw !== 'string' || idRaw.length !== 1 ||
+      typeof challengeRaw !== 'string' || challengeRaw.length !== 16 ||
+      typeof password !== 'string') return null;
+  var values = [], i, code;
+  var combined = idRaw + challengeRaw;
+  for (i = 0; i < combined.length; i++) {
+    code = combined.charCodeAt(i);
+    if (code > 255) return null;
+    values.push(code);
+  }
+  return md5([values[0]].concat(utf8Bytes(password), values.slice(1)));
+}
+w.NajmChap = {response:challengeResponse, responseRaw:challengeResponseRaw};
 })(window);
